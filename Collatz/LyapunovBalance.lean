@@ -524,9 +524,8 @@ private lemma LZ_orbit_eq_OrbitPatternBridge_orbit_of_odd (n : ℕ) (hn : Odd n)
     3. OrbitPatternBridge.orbit = orbit_raw for odd n
     4. Therefore orbits are bounded
 
-    Note: Requires MountainEnv instance for the Baker/TiltBalance machinery. -/
-theorem no_divergence_from_lyapunov (n₀ : ℕ) (hn₀ : n₀ > 1) (hn₀_odd : Odd n₀)
-    [Collatz.TiltBalance.Mountainization.MountainEnv] :
+    Uses Baker/TiltBalance machinery (no MountainEnv needed since 2026-01-29). -/
+theorem no_divergence_from_lyapunov (n₀ : ℕ) (hn₀ : n₀ > 1) (hn₀_odd : Odd n₀) :
     ∃ B : ℕ, ∀ m : ℕ, OrbitPatternBridge.orbit n₀ m ≤ B := by
   -- First, establish that OrbitPatternBridge.orbit = orbit_raw
   have h_T_eq : ∀ x, OrbitPatternBridge.T x = Collatz.syracuse_raw x := by

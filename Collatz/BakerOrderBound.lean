@@ -81,12 +81,17 @@ axiom baker_gap_bound (S k : ℕ) (hk : k ≥ 2) (hD_pos : 2^S > 3^k) :
     Reference: Eliahou 1993, Simons & de Weger 2003. -/
 def baker_cycle_length_bound : ℕ := 10^8
 
+/-- Wavesum of a critical-line cycle profile with division counts ν.
+    This is the numerator in the cycle equation n = W / D. -/
+def cyclicWaveSum (m : ℕ) (ν : Fin m → ℕ) : ℕ :=
+  ∑ j : Fin m, 3^(m - 1 - j.val) * 2^(∑ i ∈ Finset.filter (· < j) Finset.univ, ν i)
+
 /-- Baker's theorem on linear forms in logarithms implies minimum cycle length.
 
     **Mathematical justification**:
     For a cycle of length m on the critical line (S = 2m):
     - Cycle equation: n · (4^m - 3^m) = W (the waveSum)
-    - D = 4^m - 3^m > 0 for all m ≥ 1
+    - D = 4^m - 3^m > 0 for all m ≥ 2
     - Baker's theorem: D ≥ 3^m / m^C for effective constant C
     - Wavesum bound: For nontrivial cycles, W ≤ poly(m) · 3^m
     - Therefore: n = W/D ≤ poly(m) · m^C
@@ -94,13 +99,12 @@ def baker_cycle_length_bound : ℕ := 10^8
     The computational verification (Eliahou, Simons-de Weger) shows no cycles
     exist with m < 10^8 by exhaustive search combined with Baker bounds.
 
-    The nontriviality condition W > D means n = W/D > 1, i.e., the cycle
-    starts at some n > 1 (not the fixed point n = 1). -/
-axiom baker_critical_line_cycle_bound (m : ℕ) (hm : 1 ≤ m)
-    (hD_pos : (4 : ℕ)^m > 3^m)
-    (W : ℕ) (hW_pos : 0 < W)
-    (hW_div : ((4 : ℕ)^m - 3^m) ∣ W)
-    (h_nontrivial : W > (4 : ℕ)^m - 3^m) :  -- n = W/D > 1, nontrivial cycle
+    The ν-pattern must be valid (each νⱼ ≥ 1, total = 2m) and the resulting
+    wavesum must be divisible by D with W > D (nontrivial cycle, n > 1). -/
+axiom baker_critical_line_cycle_bound (m : ℕ) (hm : m ≥ 2)
+    (ν : Fin m → ℕ) (hν_pos : ∀ j, ν j ≥ 1) (hν_sum : ∑ j : Fin m, ν j = 2 * m)
+    (hD_div : ((4 : ℕ)^m - 3^m) ∣ cyclicWaveSum m ν)
+    (h_nontrivial : cyclicWaveSum m ν > (4 : ℕ)^m - 3^m) :
     m ≥ baker_cycle_length_bound
 
 /-! ## The Gap D -/

@@ -37,8 +37,6 @@ namespace Collatz.LyapunovBakerConnection
 
 open Collatz.Bleeding
 
-variable [Collatz.TiltBalance.Mountainization.MountainEnv]
-
 /-! ## Part 0: Bridge Between Orbit Functions -/
 
 /-- DriftLemma.orbit equals orbit_raw. Both iterate the Syracuse map. -/

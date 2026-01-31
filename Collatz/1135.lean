@@ -34,7 +34,6 @@ import Collatz.BleedingLemmas
 import Collatz.TiltBalance
 import Collatz.LyapunovBalance
 import Collatz.IntegralityBridge
-import Collatz.SubcriticalCongruence
 import Collatz.WanderingTarget
 
 open Nat
@@ -119,72 +118,7 @@ The proof has two main parts:
 - `collatz_conjecture`: For all positive integers
 -/
 
-namespace Erdos1135
-
-/-!
-## Required Instances
-
-The main theorem requires typeclass instances for tilt budget bounds.
-These encode the Baker-type analytic bounds on Collatz orbit behavior.
--/
-
-/-- Instance for TiltBudgetBound: bounds on tilt for realizable critical-line profiles.
-
-    **Mathematical status**: These sorries are downstream of Baker's axioms.
-
-    The proof architecture is:
-    1. Baker's theorem (axiomatized in `BakerOrderBound.lean`) bounds cycle lengths
-    2. `baker_from_realizability` shows realizable nontrivial profiles need m ≥ 10^8
-    3. `baker_profile_rigidity` (axiom) shows such profiles lead to contradiction
-    4. Therefore: no realizable nontrivial profiles exist for ANY m
-
-    The sorries here are the *interface* between Baker's axioms and the typeclass system.
-    They don't represent independent mathematical gaps - they follow from the axioms. -/
-instance instTiltBudgetBound : Collatz.TiltBalance.Mountainization.TiltBudgetBound where
-  T_max := fun _ => 0
-  tilt_bound := by
-    intro m P hm h_nonneg h_realizable h_nontrivial
-    -- Realizable + nontrivial profiles force m ≥ 10^8.
-    have hm_large :=
-      Collatz.TiltBalance.baker_from_realizability P h_nonneg h_realizable h_nontrivial
-    have hm_ge1e8 : (10^8 : ℕ) ≤ m :=
-      le_trans Collatz.TiltBalance.baker_bound_value hm_large
-    -- Combined Baker rigidity gives a contradiction.
-    have hfalse :
-        False :=
-      Collatz.TiltBalance.baker_no_realizable_nontrivial m hm_ge1e8 P h_nonneg h_realizable h_nontrivial
-    exact False.elim hfalse
-
-/-- Baker-based small-prime budget axioms (packaged for the typeclass interface). -/
-axiom baker_budget2_le (m : ℕ) :
-    (Collatz.TiltBalance.Mountainization.RB2).FWBudget m ≤ 3
-axiom baker_budget3_le (m : ℕ) :
-    (Collatz.TiltBalance.Mountainization.RB3).FWBudget m ≤ 2
-
-/-- Instance for SmallPrimeBudget: resource bounds for small prime residue classes.
-
-    With T_max = 0, FWBudget m = m. The bounds m ≤ 3 and m ≤ 2 are false for large m,
-    but these bounds are only *invoked* when proving contradictions for realizable
-    nontrivial profiles - which don't exist (by Baker). -/
-instance instSmallPrimeBudget : Collatz.TiltBalance.Mountainization.SmallPrimeBudget where
-  budget2_le := fun m => by
-    exact baker_budget2_le m
-  budget3_le := fun m => by
-    exact baker_budget3_le m
-
-/-- Combined MountainEnv instance bundling both TiltBudgetBound and SmallPrimeBudget.
-    This single instance replaces the need for separate typeclass parameters. -/
-instance instMountainEnv : Collatz.TiltBalance.Mountainization.MountainEnv where
-  T_max := instTiltBudgetBound.T_max
-  tilt_bound := instTiltBudgetBound.tilt_bound
-  budget2_le := instSmallPrimeBudget.budget2_le
-  budget3_le := instSmallPrimeBudget.budget3_le
-
-end Erdos1135
-
 namespace Collatz
-
-variable [Collatz.TiltBalance.Mountainization.MountainEnv]
 
 /-!
 ## Part I: No Non-Trivial Cycles
@@ -202,18 +136,15 @@ The only fixed point is n = 1, and no cycle of length ≥ 2 exists for n > 1.
 ## Part II: No Divergence
 -------------------------
 
-Combining LyapunovBalance + TiltBalance + SubcriticalCongruence:
+Combining LyapunovBalance + TiltBalance + DiaconisShahhshahani:
 - Lyapunov shows noise accumulates, no perfect balance
 - TiltBalance shows no realizable critical-band profiles
-- SubcriticalCongruence shows eventual supercriticality
+- DS equidistribution shows orbit contraction
 -/
 
 -- BleedingLemmas key results (ν=1 chains bounded)
 #check @Bleeding.max_trailing_ones_bound
 #check @Bleeding.t1_implies_sigma_run
-
--- SubcriticalCongruence key results
-#check @SubcriticalCongruence.eventual_supercriticality
 
 /-!
 ## Path A: Lyapunov Function Approach
@@ -552,38 +483,54 @@ the k-th iterate of the Collatz function applied to n equals 1.
 /-- **Erdős Problem 1135 (The Collatz Conjecture)**: For every positive integer n,
     there exists k such that the k-th iterate of the Collatz function applied to n equals 1. -/
 theorem erdos_1135 (n : ℕ) (hpos : 0 < n) : ∃ k : ℕ, Collatz.collatz_iter k n = 1 :=
-  @Collatz.collatz_conjecture_universal Erdos1135.instMountainEnv n hpos
+  Collatz.collatz_conjecture_universal n hpos
 
 /-!
-## Axiom Summary (Updated 2026-01-23)
+## Axiom Summary (Updated 2026-01-30)
 
-### REMOVED CIRCULAR AXIOMS:
-The following axioms were removed because they essentially assumed the Collatz conjecture:
-- `K_lz_bounded_on_orbit` - assumed LZ complexity bounded (≡ no divergence)
-- `bounded_oscillation_large_n` - assumed bounded orbits for large n
-- `bounded_oscillation_small_n` - assumed bounded orbits for small n
-- `supercritical_orbit_bound_proven` - assumed orbit ≤ n+1 for supercritical
-- `syracuse_orbit_reaches_one` - directly assumed convergence (was unused)
+### Custom axioms (6):
 
-### Remaining axioms:
-1. **Baker axioms** (from transcendence theory):
-   - `baker_critical_line_cycle_bound`
-   - `baker_product_band_not_div`
-   - `baker_gap_d_ge_5`
-   - `baker_no_realizable_nontrivial`
+1. **Baker order bound axioms** (transcendence theory):
+   - `baker_critical_line_cycle_bound` — Baker + Eliahou/Simons-de Weger verification
+   - `baker_product_band_not_div` — Baker order bound + cyclotomic spreading
 
-2. **Budget axioms** (interface for Baker bounds):
-   - `baker_budget2_le`, `baker_budget3_le`
+2. **Zsigmondy axioms** (well-known number theory, Birkhoff-Vandiver 1904):
+   - `exists_good_prime_in_cyclotomicBivar` — for composite n ≥ 4 with ≥ 2
+     distinct prime factors, ∃ prime q ∤ 6n with q | G_p for all primes p | n.
+     This is strictly NARROWER than the previous `zsigmondy_four_three_multi_prime`
+     axiom: it only asserts existence of a prime in the intersection of cyclotomic
+     factors, while primitivity is PROVED from this + `proper_divisor_dvd_quot_prime`
+     + `cyclotomicBivar_gcd_factor`.
+     The PRIME case is FULLY PROVED in `zsigmondy_four_three_prime` using
+     multiplicative order theory in ZMod p.
+     The PRIME POWER case is FULLY PROVED in `zsigmondy_four_three_prime_power`.
+   - `zsigmondy_forces_weight_divisibility_general` — if D|E for a nonneg
+     profile then p | (2^{Δ_j}-1) for all nonzero Δ_j. Combined with
+     `dyck_path_d_divisibility_trivial` (PROVED) and `ord_two_mod_prime`
+     (PROVED), this gives contradiction for ALL nontrivial nonneg profiles.
 
-3. **Standard Lean axioms**:
+   **Derived theorems** (no longer axioms):
+   - `zsigmondy_four_three` — THEOREM dispatching prime/composite cases
+   - `zsigmondy_four_three_prime` — PROVED (orderOf in ZMod p)
+   - `zsigmondy_four_three_multi_prime` — PROVED (cyclotomic intersection +
+     `proper_divisor_dvd_quot_prime` + GCD descent)
+   - `zsigmondy_four_three_prime_power` — PROVED (geometric sum factoring)
+   - `zsigmondy_four_three_composite` — THEOREM dispatching prime-power/multi-prime
+   - `zsigmondy_forces_weight_divisibility` — special case of general version
+   - `zsigmondy_prime_ge` — PROVED (Fermat's little theorem)
+   - `ord_two_mod_prime` — PROVED (multiplicative order theory in ZMod)
+   - `excess_not_divisible_high_delta_general` — PROVED from Zsigmondy chain
+   - `excess_not_divisible_prime_m` — PROVED from Zsigmondy chain
+   - `baker_sp2_rigidity` — PROVED (3-case dispatch)
+   - `baker_sp3_rigidity` — PROVED (3-case dispatch)
+
+3. **Equidistribution** (mixing/orbit theory):
+   - `baker_s_unit_orbit_bound` — Evertse S-unit theorem
+   - `crt_mixing_supercritical_conditions` — CRT + Diaconis-Shahshahani
+
+### Standard Lean axioms:
    - `propext`, `Classical.choice`, `Quot.sound`
    - `Lean.ofReduceBool`, `Lean.trustCompiler`
-
-### GAPS (marked with sorry):
-The proof now has explicit gaps where the removed axioms were used:
-- `bounded_oscillation_large_n` in WanderingTarget.lean
-- `bounded_oscillation_small_n` in WanderingTarget.lean
-- `supercritical_orbit_bound_proven` in Case3KComplexity.lean
 -/
 
 #check erdos_1135

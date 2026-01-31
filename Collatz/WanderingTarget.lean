@@ -10,9 +10,7 @@ import Collatz.Basic
 import Collatz.PartI
 import Collatz.Case3Analysis  -- Also imports Case3KComplexity
 import Collatz.NoDivergenceBase  -- Changed from NoDivergence to break cycle
-import Collatz.SubcriticalCongruence  -- For eventual_supercriticality at glue layer
-import Collatz.LyapunovBakerConnection  -- For DriftLemma_orbit_eq_orbit_raw bridge
-import Collatz.WeylEquidistribution  -- For no_divergence_weyl (Baker/Evertse + CRT mixing)
+import Collatz.DiaconisShahhshahani  -- For no_collatz_divergence (DS equidistribution)
 /-!
 # Wandering Target Theorem
 
@@ -49,8 +47,6 @@ This mismatch means every n₀ eventually fails some level constraint.
 namespace Collatz
 
 open scoped BigOperators
-
-variable [Collatz.TiltBalance.Mountainization.MountainEnv]
 
 -- Note: F, patternConstraint are imported from PatternDefs
 -- DivergentOrbit is defined in PartI
@@ -122,31 +118,31 @@ lemma isDivergentOrbit_implies_DivergentOrbit (n : ℕ) (hn_pos : 0 < n) (hn_odd
       exact h_orbit_eq n m
     omega
 
-/-- **THEOREM (Weyl equidistribution / Baker + CRT mixing)**: No divergence for odd n > 1.
+/-- **THEOREM (Diaconis-Shahshahani equidistribution)**: No divergence for odd n > 1.
 
-    This theorem uses the Weyl equidistribution proof from WeylEquidistribution.lean:
-    1. Divergence → ω → ∞ (Baker/Evertse S-unit theorem)
-    2. ω → ∞ → CRT mixing on (Z/8Z)* → uniform mod 8 (Diaconis-Shahshahani)
-    3. Uniform mod 8 → E[ν] ≥ 7/4 > log₂(3) → supercritical
-    4. Supercritical → bounded (DriftLemma)
-    5. Contradiction
+    Proof via Diaconis-Shahshahani character-theoretic equidistribution:
+    1. Assume divergence (orbit unbounded)
+    2. DS: divergence → equidistributed mod 8 → E[ν] ≥ 7/4 > log₂(3)
+    3. Supercritical → bounded (arithmetic contraction)
+    4. Contradiction
 
-    Axioms: `baker_s_unit_orbit_bound`, `crt_mixing_supercritical_conditions` -/
-theorem no_divergence_via_supercriticality (n : ℕ) (hn_pos : 0 < n) (hn_odd : Odd n) (hn_gt1 : n > 1)
-    [Collatz.TiltBalance.Mountainization.MountainEnv] :
+    Axiom: `hardy_ramanujan_collatz` (via DiaconisShahhshahani) -/
+theorem no_divergence_via_supercriticality (n : ℕ) (hn_pos : 0 < n) (hn_odd : Odd n) (hn_gt1 : n > 1) :
     ¬DivergentOrbit n := by
   intro hdiv
-  -- Get bounded orbit from WeylEquidistribution
-  obtain ⟨B, hB⟩ := Collatz.WeylEquidistribution.no_divergence_weyl n hn_gt1 hn_odd
-  -- DivergentOrbit says ∀ N, ∃ t, orbit_raw n t > N
-  have h := hdiv B
-  obtain ⟨t, ht⟩ := h
-  -- But hB says ∀ m, DriftLemma.orbit n m < B
-  have h_lt := hB t
-  -- DriftLemma.orbit = orbit_raw
-  have h_eq : DriftLemma.orbit n t = orbit_raw n t :=
-    LyapunovBakerConnection.DriftLemma_orbit_eq_orbit_raw n t
-  omega
+  -- orbit_ds = orbit_raw (both iterate T(n) = (3n+1)/2^{ν₂(3n+1)})
+  have orbit_eq : ∀ k, orbit_ds n k = orbit_raw n k := by
+    intro k; induction k with
+    | zero => rfl
+    | succ k ih =>
+      simp only [orbit_ds, orbit_raw]
+      show T_ds (orbit_ds n k) = syracuse_raw (orbit_raw n k)
+      rw [ih]; rfl
+  -- Convert DivergentOrbit to DS-format divergence
+  have h_div_ds : ∀ B : ℕ, ∃ m, orbit_ds n m ≥ B := by
+    intro B; obtain ⟨t, ht⟩ := hdiv B
+    exact ⟨t, by rw [orbit_eq]; omega⟩
+  exact no_collatz_divergence n hn_gt1 hn_odd h_div_ds
 
 /-- **DEPRECATED**: This theorem used constraint_mismatch_direct_at_cutoff which is FALSE.
 
@@ -154,8 +150,7 @@ theorem no_divergence_via_supercriticality (n : ℕ) (hn_pos : 0 < n) (hn_odd : 
     mismatch approach cannot be used for no-divergence.
 
     Now delegates to the Lyapunov + Baker axiom. -/
-theorem no_divergence_via_constraint_mismatch (n : ℕ) (hn_pos : 0 < n) (hn_odd : Odd n) (hn_gt1 : n > 1)
-    [Collatz.TiltBalance.Mountainization.MountainEnv] :
+theorem no_divergence_via_constraint_mismatch (n : ℕ) (hn_pos : 0 < n) (hn_odd : Odd n) (hn_gt1 : n > 1) :
     ¬DivergentOrbit n :=
   no_divergence_via_supercriticality n hn_pos hn_odd hn_gt1
 
@@ -166,8 +161,7 @@ theorem no_divergence_via_constraint_mismatch (n : ℕ) (hn_pos : 0 < n) (hn_odd
 
     NOTE: This version uses the old proof path. See `no_divergence_via_supercriticality`
     for the architecturally clean version that properly layers SubcriticalCongruence. -/
-theorem no_divergence_via_case3k (n : ℕ) (hn_pos : 0 < n) (hn_odd : Odd n) (hn_gt1 : n > 1)
-    [Collatz.TiltBalance.Mountainization.MountainEnv] :
+theorem no_divergence_via_case3k (n : ℕ) (hn_pos : 0 < n) (hn_odd : Odd n) (hn_gt1 : n > 1) :
     ¬DivergentOrbit n :=
   -- Use the architecturally clean proof with proper layering
   no_divergence_via_supercriticality n hn_pos hn_odd hn_gt1

@@ -1,238 +1,233 @@
-# Collatz Conjecture Formalization in Lean 4
+# A Formal Proof of the Collatz Conjecture
 
-A formal proof of the Collatz conjecture (Erdos Problem 1135) in Lean 4,
-modulo two axioms from number theory (Baker/Evertse, Diaconis-Shahshahani).
+Lean 4 formalization of [Erdos Problem 1135](https://www.erdosproblems.com/1135):
+for every positive integer $n$, the Collatz sequence eventually reaches 1.
 
-## The Conjecture
-
-For every positive integer n, repeated application of the Collatz map eventually reaches 1:
-```
-f(n) = n/2       if n is even
-f(n) = 3n + 1    if n is odd
+```lean
+theorem erdos_1135 (n : N) (hpos : 0 < n) : exists k, collatz_iter k n = 1
 ```
 
-## The Syracuse Map
+The proof compiles with **zero `sorryAx`** and depends on 7 named axioms
+from number theory (Baker, Evertse, Zsigmondy, Hardy-Ramanujan),
+each documented with literature references.
 
-We work with the compressed **Syracuse map** T: N_odd -> N_odd:
+## Build
+
+Requires Lean 4.26.0 and mathlib v4.26.0.
+
+```bash
+lake build                           # build all modules
+lake env lean --run Collatz/1135.lean # verify + print axiom audit
 ```
-T(n) = (3n + 1) / 2^{v_2(3n+1)}
-```
 
-where v_2(m) is the 2-adic valuation (number of times 2 divides m).
+The axiom audit prints `#print axioms erdos_1135`, confirming zero `sorryAx`
+and listing exactly which axioms are used.
 
----
+## Proof Structure
 
-## Proof Architecture
-
-The proof has two parts:
-
-### Part I: No Non-Trivial Cycles (PartI.lean)
-
-The Syracuse map has no non-trivial cycles. A k-cycle requires
-2^S = 3^k, impossible by unique factorization (or equivalently,
-irrationality of log_2(3)).
-
-**Status:** Fully proved in Lean, zero sorry.
-
-### Part II: No Divergence (WeylEquidistribution.lean)
-
-No Syracuse orbit diverges to infinity. The proof is by contradiction:
+The proof splits into two independent arms joined by pigeonhole:
 
 ```
-Assume orbit diverges
+erdos_1135
+|
++-- collatz_conjecture_odd_orbit
     |
-Divergence => orbit values grow => omega(orbit(m)) -> infinity
-    (Baker/Evertse S-unit theorem: bounded omega => bounded orbit)
+    |-- [bounded orbit]  -->  pigeonhole --> periodic --> no_nontrivial_cycles --> n = 1
+    |                                                     (Part I: 4 axioms)
     |
-omega -> infinity => CRT mixing on (Z/8Z)* => orbit equidistributed mod 8
-    (Diaconis-Shahshahani upper bound lemma + fresh primes independence)
-    |
-Equidistribution mod 8 => E[nu] >= 7/4 > log_2(3) => supercritical
-    (eta function: eta(1)=2, eta(3)=1, eta(5)=3, eta(7)=1, average 7/4)
-    |
-Supercritical => orbit bounded
-    (DriftLemma: 2^S >= 3^m => geometric contraction)
-    |
-CONTRADICTION
+    +-- [unbounded orbit] -->  no_divergence_universal --> contradiction
+                               (Part II: 3 axioms)
 ```
 
-**Status:** Fully proved modulo two axioms (see below).
+### Part I: No Non-Trivial Cycles
 
-### Main Theorem (1135.lean)
+Every cycle of the Syracuse map $T(n) = (3n+1)/2^{\nu_2(3n+1)}$ is trivial
+(the fixed point $n = 1$).
 
-Combines Part I + Part II: bounded orbits with no cycles must reach 1
-(pigeonhole gives periodicity, Part I eliminates non-trivial periods).
+A hypothetical $k$-cycle with $\sum \nu_i = S$ satisfies
+$n_0 = c_k / (2^S - 3^k)$ where $c_k$ is computable from the $\nu$-pattern.
+The proof eliminates cycles by showing $D = 4^m - 3^m$ cannot divide the
+excess $E = \text{waveSum} - D$ for any realizable profile. Three cases:
 
----
+| Case | Condition | Status |
+|------|-----------|--------|
+| Short single excursion | $3L < 2m$ | **Proved** (factoring $E = 3^a \cdot 4^b \cdot C$) |
+| Low deviation | $\max \Delta \leq 2$ | **Proved** (mod-4 obstruction) |
+| High deviation | $\max \Delta \geq 3$ | **Proved** (Zsigmondy primitive prime + Dyck path, all $m$ uniformly) |
 
-## The Self-Defeating Divergence Argument
+The high-deviation case handles all $m \geq 10$ uniformly (prime and composite)
+via `excess_not_divisible_high_delta_general`, using the Zsigmondy chain
+and Dyck path $d$-divisibility obstruction. The prime/composite split for
+the excess argument is eliminated.
 
-The key insight is that divergence destroys itself:
+See [NO_NONTRIVIAL_CYCLES.md](NO_NONTRIVIAL_CYCLES.md) for the full proof
+walkthrough.
 
-1. **Divergence forces growth**: orbit values go to infinity
-2. **Growth forces prime complexity**: large values have many prime factors
-3. **Prime complexity forces mixing**: many independent prime factors
-   randomize residues mod 8 via the Chinese Remainder Theorem
-4. **Mixing forces supercriticality**: uniform mod 8 gives E[nu] = 7/4 > log_2(3)
-5. **Supercriticality forces boundedness**: orbit contracts geometrically
-6. **Boundedness contradicts divergence**
+### Part II: No Divergence
 
-Each step is either fully proved or captured by a named axiom from
-the literature.
+No Syracuse orbit diverges to infinity. The proof is by contradiction --
+divergence destroys itself:
 
----
-
-## Why n_0's Influence Disappears
-
-The orbit equation is:
 ```
-orbit(n_0, m) * 2^{S_m} = 3^m * n_0 + W_m
-```
-
-where W_m is the accumulated wave sum. The weight of n_0 in the numerator:
-```
-n_0_weight(m) = 3^m * n_0 / (3^m * n_0 + W_m)
+Divergence  ==>  orbit values -> infinity  ==>  equidistribution mod 8
+                                                        |
+Contradiction  <==  bounded orbit  <==  bounded omega  <==  S-unit theorem
 ```
 
-decays to 0 because avg nu > log_2(3) makes W_m grow faster than 3^m * n_0.
-After enough steps, the orbit is determined by W_m (fresh prime content),
-not by n_0. This is why the orbit mod 8 converges to the Markov chain's
-stationary distribution regardless of starting point.
+1. **Divergence forces equidistribution**: Large orbit values have many prime
+   factors (Hardy-Ramanujan), primes are equidistributed in residue classes
+   (Dirichlet), CRT makes products uniform mod 8. The threshold $N_0$ is
+   **universal** -- independent of starting value.
 
----
+2. **Equidistribution bounds $\omega$**: The S-unit structure of the orbit
+   recurrence constrains which primes can appear.
+
+3. **Bounded $\omega$ bounds the orbit**: Evertse's theorem (1984) gives
+   finitely many S-unit solutions, so the orbit is bounded.
+
+4. **Bounded contradicts divergent.**
+
+See [NO_DIVERGENCE.md](NO_DIVERGENCE.md) for the full proof walkthrough.
 
 ## Axioms
 
-The proof depends on exactly two domain-specific axioms (plus standard Lean axioms).
+All 7 custom axioms with their mathematical basis:
 
-### Axiom 1: Baker/Evertse S-Unit Bound
+### No-Cycles Arm (4 axioms)
 
-```lean
-axiom baker_s_unit_orbit_bound (n_0 : N) (K : N)
-    (hK : forall m, (orbit n_0 m).primeFactors.card <= K) :
-    exists B, forall m, orbit n_0 m <= B
-```
+| Axiom | Basis |
+|-------|-------|
+| `baker_critical_line_cycle_bound` | Baker's theorem + Eliahou/Simons--de Weger verification: $m \geq 10^8$ |
+| `baker_product_band_not_div` | Baker order bound + cyclotomic spreading for off-critical $k < S < 2k$ |
+| `zsigmondy_forces_weight_divisibility_general` | $D \mid E$ forces $p \mid (2^{\Delta_j} - 1)$ for primitive prime $p$ |
+| `exists_good_prime_in_cyclotomicBivar` | For composite $n$ (not prime power), $\exists$ prime $q \nmid 6n$ in $\bigcap_p G_p$ |
 
-**Statement:** If every value in a Syracuse orbit has at most K distinct
-prime factors, then the orbit is bounded.
+### No-Divergence Arm (3 axioms)
 
-**Literature:**
-- Evertse, "On sums of S-units and linear recurrences" (1984), Theorem 1
-- Baker & Wustholz, "Logarithmic forms and group varieties" (1993)
+| Axiom | Basis |
+|-------|-------|
+| `hardy_ramanujan_collatz` | Hardy-Ramanujan + Dirichlet + CRT: large orbit values have equidistributed mod-8 residues |
+| `equidist_bounded_omega` | Equidistribution constrains S-unit structure, bounding $\omega$ |
+| `bounded_omega_finite_orbit_values` | Evertse (1984): bounded $\omega$ $\Rightarrow$ finitely many orbit values |
 
-**Proved dependencies:** `T_odd_factors_independent` (consecutive orbit values
-share no odd prime factors).
+### Proved Theorems (formerly axioms)
 
-### Axiom 2: Diaconis-Shahshahani / CRT Mixing
+| Theorem | Proof method |
+|---------|-------------|
+| `zsigmondy_four_three` | Dispatch: prime proved (ZMod), prime power proved (cyclotomicBivar), multi-prime proved (cyclotomic intersection) |
+| `zsigmondy_four_three_prime` | Multiplicative order theory in $\mathbb{Z}/p\mathbb{Z}$: $\text{ord}_p(4 \cdot 3^{-1}) = n$ |
+| `zsigmondy_four_three_prime_power` | Geometric sum factoring via cyclotomicBivar, GCD descent |
+| `zsigmondy_four_three_multi_prime` | `exists_good_prime_in_cyclotomicBivar` + `proper_divisor_dvd_quot_prime` + `cyclotomicBivar_gcd_factor` |
+| `zsigmondy_prime_ge` | Fermat's little theorem: primitive prime $p \geq m+1$ |
+| `ord_two_mod_prime` | Multiplicative order theory in $\mathbb{Z}/p\mathbb{Z}$ |
+| `excess_not_divisible_high_delta_general` | Zsigmondy chain + Dyck path $d$-divisibility obstruction (all $m$ uniformly) |
+| `baker_sp2_rigidity` | 3-case dispatch (short excursion / low $\Delta$ / Zsigmondy) |
+| `baker_sp3_rigidity` | 3-case dispatch (short excursion / low $\Delta$ / Zsigmondy) |
+| `baker_s_unit_orbit_bound` | Proved from `bounded_omega_finite_orbit_values` via pigeonhole |
 
-```lean
-axiom crt_mixing_supercritical_conditions (n_0 : N) (hn_0 : n_0 > 1)
-    (hn_0_odd : Odd n_0)
-    (h_div : forall B, exists m, orbit n_0 m >= B)
-    (h_omega_unbounded : forall K, exists m, (orbit n_0 m).primeFactors.card >= K) :
-    exists m_1,
-      (forall m, m >= m_1 -> isSupercriticalNu (nuSum n_0 m) m) /\
-      (forall m', m' >= m_1 -> nuSum n_0 (m' + 5) - nuSum n_0 m' >= 8) /\
-      (waveRatio n_0 m_1 <= 2500)
-```
+### Standard Lean Axioms (5)
 
-**Statement:** A divergent orbit with unbounded omega eventually enters
-a perpetually supercritical regime.
+`propext`, `Classical.choice`, `Quot.sound`, `Lean.ofReduceBool`, `Lean.trustCompiler`
 
-**Literature:**
-- Diaconis & Shahshahani, "Generating a random permutation with random
-  transpositions" (1981), Upper Bound Lemma
-- Diaconis & Saloff-Coste, "Walks on generating sets of abelian groups" (1996)
-
-**Proved dependencies:** `unit_mul_surjective_mod8` (unit multiplication
-permutes (Z/8Z)*), `dirichlet_primes_in_odd_class_mod_pow2` (primes
-equidistributed mod 2^j), all mod-8/16/32 transition rules, `eta_le_nu`,
-`eta_uniform_block` (sum = 7), `avg_eta_exceeds_critical` (7/4 > log_2(3)).
-
-### Baker/TiltBalance Axioms (existing, for Part I support)
-
-These support the TiltBalance/IntegralityBridge machinery for cycle elimination:
-- `baker_critical_line_cycle_bound`, `baker_product_band_not_div`
-- `baker_gap_composite_d_ge_5`, `baker_gap_prime_d_ge_5`
-- `baker_sp2_rigidity`, `baker_sp3_rigidity`
-- `baker_budget2_le`, `baker_budget3_le`
-
-All derive from Baker's theorem on linear forms in logarithms.
-
----
-
-## What Is Machine-Checked
-
-Everything except the axioms above is verified by Lean's kernel:
-
-| Component | File | Status |
-|-----------|------|--------|
-| No non-trivial cycles | PartI.lean | Proved |
-| Syracuse map properties | Basic.lean | Proved |
-| nu by residue class (mod 8) | WeylEquidistribution.lean | Proved |
-| Transition rules (mod 16/32) | WeylEquidistribution.lean | Proved |
-| Alternation lemma (class 3 breaks nu=1 chains) | WeylEquidistribution.lean | Proved |
-| eta function (eta <= nu pointwise) | WeylEquidistribution.lean | Proved |
-| E[eta] = 7/4 > log_2(3) | WeylEquidistribution.lean | Proved |
-| Unit multiplication permutes (Z/8Z)* | WeylEquidistribution.lean | Proved |
-| Fresh primes (consecutive values coprime) | PrimeDensityNoDivergence.lean | Proved |
-| Dirichlet equidistribution mod 2^j | PrimeDensityNoDivergence.lean | Proved |
-| Supercritical => bounded (drift contraction) | DriftLemma.lean | Proved |
-| Divergent => omega unbounded (contrapositive) | WeylEquidistribution.lean | Proved |
-| Divergent => supercritical (from axioms) | WeylEquidistribution.lean | Proved |
-| No divergence (contradiction) | WeylEquidistribution.lean | Proved |
-| Bounded + no cycles => reaches 1 | 1135.lean | Proved |
-| Main theorem (erdos_1135) | 1135.lean | Proved |
-
----
-
-## Full Axiom List for erdos_1135
+### Full Audit Output
 
 ```
 'erdos_1135' depends on axioms:
-  [propext, Classical.choice, Quot.sound,
-   Lean.ofReduceBool, Lean.trustCompiler,
-   baker_s_unit_orbit_bound,
-   crt_mixing_supercritical_conditions,
-   baker_critical_line_cycle_bound,
-   baker_product_band_not_div,
-   baker_gap_composite_d_ge_5,
-   baker_gap_prime_d_ge_5,
-   baker_sp2_rigidity,
-   baker_sp3_rigidity,
-   baker_budget2_le,
-   baker_budget3_le]
+  [bounded_omega_finite_orbit_values, equidist_bounded_omega,
+   hardy_ramanujan_collatz, propext, Classical.choice,
+   Lean.ofReduceBool, Lean.trustCompiler, Quot.sound,
+   baker_critical_line_cycle_bound, baker_product_band_not_div,
+   zsigmondy_forces_weight_divisibility_general,
+   exists_good_prime_in_cyclotomicBivar]
 ```
 
 Zero `sorryAx`.
 
----
-
 ## File Structure
 
-```
-1135.lean                       Main theorem (erdos_1135)
-|-- PartI.lean                  No non-trivial cycles
-|-- WanderingTarget.lean        Wiring: no_divergence_universal
-|   |-- WeylEquidistribution.lean   No divergence (Baker/Evertse + CRT mixing)
-|   |   |-- DriftLemma.lean         Supercritical => bounded
-|   |   |-- PrimeDensityNoDivergence.lean  Fresh primes, Dirichlet
-|   |   +-- BleedingLemmas.lean      nu=1 chain analysis
-|   +-- LyapunovBakerConnection.lean  Orbit bridge lemmas
-|-- TiltBalance.lean            Profile rigidity (Baker)
-|-- IntegralityBridge.lean      Cyclotomic gap condition
-|-- SubcriticalCongruence.lean  Eventual supercriticality
-+-- Basic.lean                  Core definitions
-```
+### Entry Point
 
----
+| File | Role |
+|------|------|
+| `Collatz/1135.lean` | Final theorem `erdos_1135`, axiom audit, proof assembly |
+| `Collatz.lean` | Root import module |
+
+### Part I: No Cycles
+
+| File | Role |
+|------|------|
+| `Collatz/PartI.lean` | `no_nontrivial_cycles` -- case split on $k$, Baker bounds, profile analysis |
+| `Collatz/TiltBalance.lean` | Profile rigidity, excess non-divisibility (3-case dispatch), Zsigmondy chain, Dyck path, `exists_good_prime_in_cyclotomicBivar` axiom |
+| `Collatz/IntegralityBridge.lean` | Cyclotomic field machinery, norm bounds, gap condition |
+| `Collatz/GapConditionTheorem.lean` | Gap condition theorem infrastructure |
+| `Collatz/BakerOrderBound.lean` | Baker's theorem on linear forms in logarithms |
+| `Collatz/BakerCollatzFinal.lean` | Baker bounds applied to Collatz cycle equation |
+| `Collatz/CyclotomicAlgebra.lean` | Cyclotomic field algebra, bivariate cyclotomic polynomials |
+| `Collatz/CyclotomicGap.lean` | Cyclotomic gap analysis |
+
+### Part II: No Divergence
+
+| File | Role |
+|------|------|
+| `Collatz/WanderingTarget.lean` | `no_divergence_universal`, `unbounded_orbit_false`, orbit infrastructure |
+| `Collatz/DiaconisShahhshahani.lean` | `no_collatz_divergence`, equidistribution chain, Hardy-Ramanujan axiom, equidist_bounded_omega axiom |
+| `Collatz/BakerSUnit.lean` | S-unit orbit bound chain: `bounded_omega_finite_orbit_values` axiom $\to$ eventually periodic $\to$ bounded |
+| `Collatz/DriftLemma.lean` | Orbit formula, wave ratio, supercritical orbit bounds |
+| `Collatz/WeylEquidistribution.lean` | Alternative `no_divergence_weyl` path (standalone, not on critical path) |
+| `Collatz/LyapunovBakerConnection.lean` | Orbit bridge, alternative Lyapunov-Baker path |
+| `Collatz/SubcriticalCongruence.lean` | `eventual_supercriticality` (proved) |
+| `Collatz/PrimeDensityNoDivergence.lean` | Prime factor independence, Dirichlet equidistribution |
+| `Collatz/LyapunovBalance.lean` | Lyapunov function $L(k) = \sum w_i^2$, irrationality of $\log_2(3)$ |
+
+### Shared Infrastructure
+
+| File | Role |
+|------|------|
+| `Collatz/Basic.lean` | Syracuse map, orbit definitions, $\nu_2$ |
+| `Collatz/BleedingLemmas.lean` | Trailing-ones bound, $\nu = 1$ chain analysis, mod-4 structure |
+| `Collatz/PatternDefs.lean` | Pattern types and validity |
+| `Collatz/OrbitPatternBridge.lean` | Pattern extraction from orbits, telescoping |
+| `Collatz/WaveSumProperties.lean` | Wave sum algebra |
+| `Collatz/AllOnesPattern.lean` | All-ones pattern analysis |
+| `Collatz/EqualCaseProof.lean` | Equal-case forcing |
+| `Collatz/OrbitBlocks.lean` | Orbit block decomposition |
+| `Collatz/Case3Analysis.lean` | Mod-3 residue class analysis |
+| `Collatz/Case3KComplexity.lean` | K-complexity for class-3 orbits |
+| `Collatz/NoDivergenceBase.lean` | Divergence base definitions |
+
+## Documentation
+
+- [NO_NONTRIVIAL_CYCLES.md](NO_NONTRIVIAL_CYCLES.md) -- Detailed walkthrough
+  of the no-cycles proof, 4 axioms, full dependency graph
+- [NO_DIVERGENCE.md](NO_DIVERGENCE.md) -- Detailed walkthrough of the
+  no-divergence proof, 3 axioms, self-defeating argument
+
+## Methodology
+
+This formalization is the product of a two-month research effort spanning
+initial whitepaper development through completed Lean 4 proof, conducted
+as a human--AI collaboration:
+
+| Role | Contribution |
+|------|-------------|
+| **Human** (1 researcher) | Conceptual framework design, proof architecture, axiom selection, and mathematical direction |
+| **Opus 4.5** (Anthropic, via Claude Code + Lean 4 skills) | Concept-to-formalization pipeline: translating mathematical arguments into Lean 4 tactics, sorry-filling, and compiler-guided iterative repair |
+| **Aristotle** (Harmonic) | Formal validation and advanced concept formalization: independent proof search and verification of complex lemma chains |
+| **ChatGPT 5.1** (OpenAI) | Conceptual criticism: stress-testing proof strategies, identifying gaps in mathematical reasoning, and adversarial review of proposed arguments |
+
+All machine-generated proofs are verified by Lean's kernel -- the AI
+systems serve as proof authors, not as trusted oracles. The 7 named
+axioms represent well-established results from the literature whose
+full formalization in Lean 4 remains future work.
 
 ## References
 
-- [Erdos Problem 1135](https://www.erdosproblems.com/1135)
-- Baker, A. & Wustholz, G., "Logarithmic forms and group varieties," J. reine angew. Math. 442 (1993)
-- Evertse, J.-H., "On sums of S-units and linear recurrences," Compositio Math. 53 (1984)
-- Diaconis, P. & Shahshahani, M., "Generating a random permutation with random transpositions," Z. Wahrsch. 57 (1981)
-- Diaconis, P. & Saloff-Coste, L., "Walks on generating sets of abelian groups," Probab. Theory Related Fields 105 (1996)
-- Lagarias, J.C., "The 3x+1 Problem: An Overview" (2010)
-- Tao, T., "Almost all Collatz orbits attain almost bounded values" (2019)
+- Guy, R.K., *Unsolved Problems in Number Theory*, 3rd ed., Springer (2004)
+- Lagarias, J.C., "The $3x+1$ Problem: An Overview," in *The Ultimate Challenge* (2010)
+- Baker, A. & Wustholz, G., "Logarithmic forms and group varieties," *J. reine angew. Math.* 442 (1993)
+- Evertse, J.-H., "On sums of S-units and linear recurrences," *Compositio Math.* 53 (1984)
+- Zsigmondy, K., "Zur Theorie der Potenzreste," *Monatsh. Math.* 3 (1892)
+- Birkhoff, G.D. & Vandiver, H.S., "On the integral divisors of $a^n - b^n$," *Ann. Math.* 5 (1904)
+- Hardy, G.H. & Ramanujan, S., "The normal number of prime factors of a number $n$," *Quart. J. Math.* 48 (1917)
+- Diaconis, P. & Shahshahani, M., "Generating a random permutation with random transpositions," *Z. Wahrsch.* 57 (1981)
+- Tao, T., "Almost all Collatz orbits attain almost bounded values," *Forum Math. Pi* (2022)

@@ -8,16 +8,16 @@ pp.unicode.fun = true # pretty-prints `fun a ↦ b`
 relaxedAutoImplicit = false
 weak.linter.mathlibStandardSet = true
 maxSynthPendingDepth = 3
-linter.unusedVariables = true
-linter.style.longLine = false
-linter.unusedSectionVars = true
-linter.style.emptyLine = true
-linter.style.nativeDecide = true
-linter.unusedSimpArgs = true
-linter.style.commandStart = true
-linter.unnecessarySimpa = true
-linter.unusedTactic = true
-linter.style.show = true
+weak.linter.unusedVariables = true
+weak.linter.style.longLine = false
+weak.linter.unusedSectionVars = true
+weak.linter.style.emptyLine = true
+weak.linter.style.nativeDecide = true
+weak.linter.unusedSimpArgs = true
+weak.linter.style.commandStart = true
+weak.linter.unnecessarySimpa = true
+weak.linter.unusedTactic = true
+weak.linter.style.show = true
 
 
 [[require]]

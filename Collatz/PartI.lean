@@ -3304,8 +3304,6 @@ theorem no_nontrivial_cycles_case_II_with_gap
   -- Contradiction!
   exact h_not_realizable h_realizable
 
-variable [Collatz.TiltBalance.Mountainization.MountainEnv]
-
 /-- **Main Case II Theorem**: No non-trivial cycles exist on the critical line.
 
     For any odd n > 1 with a hypothetical k-cycle on the critical line

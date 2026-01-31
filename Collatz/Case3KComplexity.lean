@@ -14,7 +14,6 @@ import Collatz.BleedingLemmas
 import Collatz.AristotleEntropy
 import Collatz.PartI
 import Collatz.SpectralAxioms
-import Collatz.SubcriticalCongruence
 import Collatz.v2_AlignmentBound
 
 /-!
@@ -2141,9 +2140,6 @@ namespace NoDivergence
 
 open Collatz.Case3K
 
--- Import typeclass instances required by PartI's no_nontrivial_cycles
-variable [Collatz.TiltBalance.Mountainization.MountainEnv]
-
 /-- orbit at step 0 -/
 @[simp] lemma orbit_zero (n : ℕ) : orbit n 0 = n := rfl
 
@@ -2721,9 +2717,6 @@ This is why the Collatz conjecture is specific to 3n+1.
 namespace DPIOrbitBound
 
 open Collatz Collatz.Case3K
-
--- Required for PartI.no_nontrivial_cycles
-variable [Collatz.TiltBalance.Mountainization.MountainEnv]
 
 /-! ### The Core Axioms -/
 
